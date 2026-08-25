@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getMasterAccount, resolveAccount } from "../accounts.js";
-import { fetchPaginated, isoToEpochMs, type PaginatedFetchResult } from "./common.js";
+import { fetchPaginated, isoToEpochMs, ToolError, type PaginatedFetchResult } from "./common.js";
 import type { Env } from "./common.js";
 
 const INTERNAL_TRANSFER_PATH = "/v5/asset/transfer/query-inter-transfer-list";
@@ -36,6 +36,18 @@ export async function getTransferHistory(env: Env, input: GetTransferHistoryInpu
   // this handler behaves correctly even when called directly, not only
   // through the MCP server's input-validation path.
   const transferType = input.transferType ?? "all";
+
+  // `internal`/`deposit`/`withdrawal` are three independent Bybit endpoints
+  // with independent cursor spaces — a cursor returned from one is not valid
+  // for the others. Reject the ambiguous combination instead of silently
+  // (and incorrectly) applying the same cursor to all three fan-out calls.
+  if (input.cursor && transferType === "all") {
+    throw new ToolError(
+      'A "cursor" cannot be used with transferType "all" because internal transfers, deposits, ' +
+        'and withdrawals each have their own independent pagination cursor. Narrow "transferType" ' +
+        'to "internal", "deposit", or "withdrawal" and retry with that endpoint\'s own cursor.',
+    );
+  }
 
   const sections: { internalTransfers?: PaginatedFetchResult<Record<string, unknown>>["items"]; deposits?: PaginatedFetchResult<Record<string, unknown>>["items"]; withdrawals?: PaginatedFetchResult<Record<string, unknown>>["items"] } = {};
   const cursors: Record<string, string | undefined> = {};

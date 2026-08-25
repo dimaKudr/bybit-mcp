@@ -70,4 +70,28 @@ describe("get_transfer_history", () => {
       BybitApiError,
     );
   });
+
+  it('rejects a "cursor" combined with transferType "all" without calling Bybit', async () => {
+    const fetchMock = mockFetch(() => bybitEnvelopeResponse({ list: [] }));
+
+    await expect(
+      getTransferHistory(env, { transferType: "all", cursor: "some-cursor" }),
+    ).rejects.toThrow(/independent pagination cursor/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allows a "cursor" when transferType narrows to a single endpoint', async () => {
+    const fetchMock = mockFetch((url) => {
+      expect(url.pathname).toBe("/v5/asset/deposit/query-record");
+      return bybitEnvelopeResponse({ list: [{ txID: "d1" }] });
+    });
+
+    const result = (await getTransferHistory(env, {
+      transferType: "deposit",
+      cursor: "deposit-cursor",
+    })) as unknown as { deposits?: unknown[] };
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.deposits).toHaveLength(1);
+  });
 });

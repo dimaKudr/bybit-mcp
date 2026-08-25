@@ -32,7 +32,16 @@ below for how that's enforced.
 - **MCP transport:** `@modelcontextprotocol/sdk`'s
   `WebStandardStreamableHTTPServerTransport`, mounted directly in the Worker's
   `fetch` handler, **stateless** (a fresh `McpServer` + transport is created
-  per request).
+  per request). The SDK enforces this itself: a stateless transport
+  (`sessionIdGenerator` unset) throws if reused across requests, and its
+  underlying `Protocol.connect()` throws if called twice on one server
+  without an intervening `close()` — and closing right after
+  `handleRequest()` resolves would tear down the in-flight SSE response
+  stream before the client finishes reading it. Only the **tool
+  definitions** (names/descriptions/zod schemas/handlers), which don't
+  depend on the request, are hoisted to module scope and reused; the
+  `McpServer` instance itself is deliberately rebuilt per request (see the
+  comment at its construction site in `src/index.ts`).
 
   The alternative considered was Cloudflare's `agents` package
   (`McpAgent`), which is built on Durable Objects. That's the right choice

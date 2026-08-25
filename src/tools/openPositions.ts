@@ -2,6 +2,7 @@ import { z } from "zod";
 import { categorySchema } from "../bybit/types.js";
 import { getMasterAccount, getSubAccounts, resolveAccount } from "../accounts.js";
 import type { ConfiguredAccount } from "../bybit/types.js";
+import { buildCacheKey, withCache } from "../cache.js";
 import { fetchPaginated } from "./common.js";
 import type { Env } from "./common.js";
 
@@ -19,12 +20,21 @@ export const getOpenPositionsInputSchema = z.object({
 export type GetOpenPositionsInput = z.infer<typeof getOpenPositionsInputSchema>;
 
 async function fetchPositions(account: ConfiguredAccount, input: GetOpenPositionsInput) {
-  const result = await fetchPaginated(
-    POSITION_LIST_PATH,
-    { category: input.category, symbol: input.symbol },
-    account,
+  return withCache(
+    buildCacheKey("get_open_positions", {
+      label: account.label,
+      category: input.category,
+      symbol: input.symbol,
+    }),
+    async () => {
+      const result = await fetchPaginated(
+        POSITION_LIST_PATH,
+        { category: input.category, symbol: input.symbol },
+        account,
+      );
+      return { accountLabel: account.label, positions: result.items, nextCursor: result.nextCursor };
+    },
   );
-  return { accountLabel: account.label, positions: result.items, nextCursor: result.nextCursor };
 }
 
 export async function getOpenPositions(env: Env, input: GetOpenPositionsInput) {
