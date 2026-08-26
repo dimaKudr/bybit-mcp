@@ -2,9 +2,7 @@
 
 A read-only remote MCP server exposing Bybit UTA (Unified Trading Account) data
 — master account and a small, fixed set of sub-accounts — to Claude as a
-custom connector. Runs as a Cloudflare Worker. See
-[`bybit-mcp-plan.md`](./bybit-mcp-plan.md) for the full design doc; this
-README is the practical setup/runbook.
+custom connector. Runs as a Cloudflare Worker.
 
 **This server is strictly read-only by design.** It cannot place orders,
 cancel orders, or move funds — see [Read-only by design](#read-only-by-design)
@@ -116,7 +114,7 @@ want visibility into):
 ### 2. Create the KV namespace
 
 ```bash
-wrangler kv namespace create BYBIT_ACCOUNTS
+npx wrangler kv namespace create BYBIT_ACCOUNTS
 ```
 
 This prints an `id`. Put it into `wrangler.toml`:
@@ -137,13 +135,40 @@ keys/secrets) lives entirely in this KV namespace — **not** in
 `wrangler.toml` or Worker secrets — so that adding/removing an account month
 to month is a pure data change with no redeploy.
 
+**Where to find `uid`:** it's Bybit's internal numeric account identifier, not
+something you generate — read it off the Bybit web UI:
+- Master account: click your avatar (top right) → **Account & Security**; the
+  UID is shown at the top (also next to each key on the API Management page).
+- Sub-accounts: from the master account, go to **Assets → Sub-Accounts**; each
+  sub-account listed there shows its UID.
+
+Once the master account is populated and the server is deployed, the
+`list_sub_accounts` tool (`GET /v5/user/query-sub-members`) also returns sub
+UIDs, so you can use it to double-check ones you copied by hand.
+
+**Always pass `--remote`.** Wrangler v3+ defaults `kv key put`/`get`/`delete`
+to a *local*, file-backed store used by `wrangler dev` — it will happily
+succeed and print "Resource location: local" while writing nothing your
+deployed Worker can see. `--remote` targets the actual KV namespace in your
+Cloudflare account. Every command below (and every `get`/`put`/`delete` you
+run later for day-to-day roster changes) needs it — a `put` and its
+corresponding `get` also need *matching* `--remote`/`--preview` flags, or
+they'll silently hit different local stores and the `get` will look like
+"key not found" even though the `put` reported success.
+
 One `account:<label>` entry per account:
 
 ```bash
-wrangler kv key put --binding=BYBIT_ACCOUNTS "account:master" \
+npx wrangler kv key put "account:master" \
+  --binding=BYBIT_ACCOUNTS \
+  --remote \
+  --preview false \
   '{"uid":"111111111","kind":"master","apiKey":"...","apiSecret":"..."}'
 
-wrangler kv key put --binding=BYBIT_ACCOUNTS "account:sub-trading1" \
+npx wrangler kv key put "account:sub-trading1" \
+  --binding=BYBIT_ACCOUNTS \
+  --remote \
+  --preview false \
   '{"uid":"222222222","kind":"sub","apiKey":"...","apiSecret":"..."}'
 ```
 
@@ -152,7 +177,10 @@ wrangler kv key put --binding=BYBIT_ACCOUNTS "account:sub-trading1" \
 Then a single `account-index` entry listing every configured label:
 
 ```bash
-wrangler kv key put --binding=BYBIT_ACCOUNTS "account-index" \
+npx wrangler kv key put "account-index" \
+  --binding=BYBIT_ACCOUNTS \
+  --remote \
+  --preview false \
   '["master","sub-trading1"]'
 ```
 
@@ -164,8 +192,15 @@ separate display-name/fuzzy-matching layer in v1.
 Verify with:
 
 ```bash
-wrangler kv key get --binding=BYBIT_ACCOUNTS "account-index"
-wrangler kv key get --binding=BYBIT_ACCOUNTS "account:master"
+npx wrangler kv key get "account-index" \
+  --binding=BYBIT_ACCOUNTS \
+  --remote \
+  --preview false
+
+npx wrangler kv key get "account:master" \
+  --remote \
+  --binding=BYBIT_ACCOUNTS \
+  --preview false
 ```
 
 ### 4. Set the bearer token secret
@@ -174,7 +209,7 @@ Generate a strong random token (e.g. `openssl rand -hex 32`) and store it as
 a Worker secret — never in `wrangler.toml`, never committed:
 
 ```bash
-wrangler secret put MCP_BEARER_TOKEN
+npx wrangler secret put CONNECTOR_AUTH_TOKEN
 ```
 
 You'll paste the token when prompted. Save it somewhere safe (e.g. a password
@@ -187,7 +222,7 @@ npm install
 npm run typecheck
 npm run lint
 npm test
-wrangler deploy
+npx wrangler deploy
 ```
 
 Note the deployed Worker URL (e.g. `https://bybit-mcp.<your-subdomain>.workers.dev`).
@@ -197,7 +232,7 @@ Note the deployed Worker URL (e.g. `https://bybit-mcp.<your-subdomain>.workers.d
 In Claude, go to **Settings → Connectors → Add custom connector** and add:
 
 - **URL:** `https://<your-worker-url>/mcp`
-- **Authentication:** Bearer token — paste the `MCP_BEARER_TOKEN` value from
+- **Authentication:** Bearer token — paste the `CONNECTOR_AUTH_TOKEN` value from
   step 4.
 
 Once connected, sanity-check with `list_configured_accounts` — it should
@@ -213,18 +248,21 @@ in `src/accounts.ts`):
 
 ```bash
 # Add a new sub-account
-wrangler kv key put --binding=BYBIT_ACCOUNTS "account:sub-trading11" \
+wrangler kv key put --remote --binding=BYBIT_ACCOUNTS "account:sub-trading11" \
   '{"uid":"987654321","kind":"sub","apiKey":"...","apiSecret":"..."}'
 
 # Update account-index to include it
-wrangler kv key put --binding=BYBIT_ACCOUNTS "account-index" \
+wrangler kv key put --remote --binding=BYBIT_ACCOUNTS "account-index" \
   '["master","sub-trading1","sub-trading2","sub-trading11"]'
 
 # Remove a sub-account you closed
-wrangler kv key delete --binding=BYBIT_ACCOUNTS "account:sub-trading4"
+wrangler kv key delete --remote --binding=BYBIT_ACCOUNTS "account:sub-trading4"
 
 # ...and update account-index to drop "sub-trading4" the same way as above
 ```
+
+(`--remote` is required every time, as noted in step 3 above — omitting it
+writes to a local store the deployed Worker never reads.)
 
 If `account-index` ever references a label with no matching
 `account:<label>` entry (e.g. you forgot the second command above), every

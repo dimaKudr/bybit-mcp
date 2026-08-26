@@ -1,6 +1,6 @@
 declare module "cloudflare:test" {
   interface ProvidedEnv {
-    MCP_BEARER_TOKEN: string;
+    CONNECTOR_AUTH_TOKEN: string;
     BYBIT_ACCOUNTS: KVNamespace;
   }
 }

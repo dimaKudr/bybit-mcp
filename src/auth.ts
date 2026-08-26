@@ -28,7 +28,7 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
 
 export interface AuthEnv {
   Bindings: {
-    MCP_BEARER_TOKEN: string;
+    CONNECTOR_AUTH_TOKEN: string;
     BYBIT_ACCOUNTS: KVNamespace;
   };
 }
@@ -41,7 +41,7 @@ const BEARER_PREFIX = "Bearer ";
  * response or error text.
  */
 export const bearerAuth: MiddlewareHandler<AuthEnv> = async (c, next) => {
-  const expectedToken = c.env.MCP_BEARER_TOKEN;
+  const expectedToken = c.env.CONNECTOR_AUTH_TOKEN;
   if (!expectedToken) {
     // Misconfiguration, not a client error — don't leak details either way.
     return c.text("Server misconfigured", 500);

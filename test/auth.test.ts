@@ -10,7 +10,7 @@ function buildApp() {
 }
 
 const bindings = (token: string) => ({
-  MCP_BEARER_TOKEN: token,
+  CONNECTOR_AUTH_TOKEN: token,
   BYBIT_ACCOUNTS: {} as unknown as KVNamespace,
 });
 
@@ -74,7 +74,7 @@ describe("bearerAuth", () => {
     expect(body).not.toContain("wrong-token");
   });
 
-  it("returns 500 without leaking details when MCP_BEARER_TOKEN is unset", async () => {
+  it("returns 500 without leaking details when CONNECTOR_AUTH_TOKEN is unset", async () => {
     const app = buildApp();
     const res = await app.request(
       "/protected",

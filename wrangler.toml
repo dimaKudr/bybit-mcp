@@ -12,8 +12,8 @@ compatibility_flags = ["nodejs_compat"]
 # then paste the returned `id` below.
 [[kv_namespaces]]
 binding = "BYBIT_ACCOUNTS"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "b87c5c9ea30746f1977381045b3f68df"
 preview_id = "REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID"
 
-# MCP_BEARER_TOKEN is set as a Worker secret, never here:
-#   wrangler secret put MCP_BEARER_TOKEN
+# CONNECTOR_AUTH_TOKEN is set as a Worker secret, never here:
+#   wrangler secret put CONNECTOR_AUTH_TOKEN
