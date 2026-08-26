@@ -112,7 +112,15 @@ export async function get<T>(
 
   if (!response.ok) {
     // Never echo request headers (they contain the API key/signature) in the error.
-    throw new Error(`Bybit HTTP error: ${response.status} ${response.statusText} on ${path}`);
+    // The response body is safe to include — it's Bybit's/an intermediary's reply,
+    // not anything we sent — and often carries the actual reason (e.g. a WAF/CDN
+    // block message) that a bare status code doesn't.
+    const bodyText = await response.text().catch(() => "");
+    const bodySnippet = bodyText.slice(0, 500);
+    throw new Error(
+      `Bybit HTTP error: ${response.status} ${response.statusText} on ${path}` +
+        (bodySnippet ? ` — body: ${bodySnippet}` : ""),
+    );
   }
 
   const body = (await response.json()) as BybitEnvelope<T>;

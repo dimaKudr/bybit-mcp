@@ -138,4 +138,9 @@ describe("get() request construction", () => {
     mockFetch(() => new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" }));
     await expect(get("/v5/account/info", {}, credentials)).rejects.toThrow(/500/);
   });
+
+  it("includes the response body in the error on a non-2xx HTTP response (e.g. a WAF/CDN block page)", async () => {
+    mockFetch(() => new Response("Forbidden: request blocked", { status: 403, statusText: "Forbidden" }));
+    await expect(get("/v5/account/info", {}, credentials)).rejects.toThrow(/Forbidden: request blocked/);
+  });
 });
