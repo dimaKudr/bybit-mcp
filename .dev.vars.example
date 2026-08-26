@@ -1,0 +1,4 @@
+# Copy this file to `.dev.vars` (gitignored) for local `wrangler dev` testing.
+# Never commit the real `.dev.vars` file.
+
+CONNECTOR_AUTH_TOKEN=dev-local-bearer-token-change-me

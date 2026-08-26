@@ -1,0 +1,19 @@
+name = "bybit-mcp"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The account roster (master + sub-accounts) lives in this KV namespace, not in
+# wrangler.toml or Worker secrets — see README.md for the day-to-day
+# `wrangler kv key put`/`delete` runbook for adding/removing accounts.
+#
+# Create the namespace yourself (this is NOT run for you):
+#   wrangler kv namespace create BYBIT_ACCOUNTS
+# then paste the returned `id` below.
+[[kv_namespaces]]
+binding = "BYBIT_ACCOUNTS"
+id = "b87c5c9ea30746f1977381045b3f68df"
+preview_id = "REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+# CONNECTOR_AUTH_TOKEN is set as a Worker secret, never here:
+#   wrangler secret put CONNECTOR_AUTH_TOKEN
